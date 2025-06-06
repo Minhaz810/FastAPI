@@ -3,7 +3,7 @@ from fastapi.params import Body
 from pydantic import BaseModel
 from typing import Optional
 import random
-
+from app.database import conn,cusror
 
 #making fast api instance
 class Post(BaseModel):
@@ -29,9 +29,13 @@ async def read_root():
 @app.post("/createpost")
 def createpost(new_post: Post,response:Response):
     response.status_code = status.HTTP_201_CREATED
-    post_dict = new_post.model_dump()
-    post_dict["id"] = random.randint(0,1000)
-    posts.append(post_dict)
+    cusror.execute("""INSERT INTO posts (title,description) VALUES (%s, %s) RETURNING * """,(new_post.title,new_post.content))
+    new_post = cusror.fetchone()
+    
+    # query = f"""INSERT INTO posts (title,description) VALUES ('{new_post.title}','{new_post.content}')"""
+    # print(query)
+    # cusror.execute(query)    #vulnerable
+    conn.commit()
     return {"data":new_post}
 
 def find_post(id):
@@ -41,14 +45,14 @@ def find_post(id):
         
 @app.get("/posts")
 def get_all_post():
-    return {"post_detail":posts}
+    cusror.execute("""SELECT * FROM posts""")
+    post_list = cusror.fetchall()
+    return {"post_detail":post_list}
 
 @app.get("/posts/{id}")
 def readpost(id:int,response:Response):
-    post = find_post(id)
-    if not post:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"post with {id} was not found")
+    cusror.execute("""SELECT * FROM posts WHERE id = %s""",(id,))
+    post = cusror.fetchone()
     return {"post_detail":post}
 
 def find_index_post(id):
@@ -75,4 +79,4 @@ def update_post(id:int,post:Post):
     posts[index]["content"] = body["content"]
 
     return {f"Updated post with id {id}"}
-    
+

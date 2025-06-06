@@ -81,4 +81,37 @@ In contrast, when you use a Pydantic model as a parameter in your endpoint funct
 
 ```
 
-__N.B:__ Fastapi automatically generates swagger UI, it has built in module in it
+__N.B:__ Fastapi automatically generates swagger UI, it has built in module in it.
+
+__N.B:__ if we connect the database like this
+```bash
+conn = psycopg2.connect(host="localhost",database="fastapi_test",user="postgres",password="pgadmin",port=5432)
+```
+then we don not get the column names, instead we only get the values
+
+__N.B:__ to get the column names, we should be doing this
+
+```bash
+from psycopg2.extras import RealDictCursor
+conn = psycopg2.connect(host="localhost",database="fastapi_test",user="postgres",password="pgadmin",port=5432,cursor_factory=RealDictCursor)
+```
+
+
+__Passing Variable into the SQL query__
+```bash
+cusror.execute("""INSERT INTO posts (title,description) VALUES (%s, %s) """,(new_post.title,new_post.content))
+```
+
+__We can also do this__
+```bash
+cusror.execute(f"""INSERT INTO posts (title,description) VALUES ({new_post.title},{new_post.desctription})""")
+```
+__but...__
+
+if some one sends some mallicious sql query into the title, then it would be a sql injection, like he can delete the whole table by this payload
+```json
+{
+  "title": "Test','Test'); DELETE FROM posts; --",
+  "content": "Malicious test"
+}
+```
