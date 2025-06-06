@@ -80,3 +80,5 @@ When you use request.body() or request.json() directly inside your function, the
 In contrast, when you use a Pydantic model as a parameter in your endpoint function, FastAPI automatically handles the asynchronous reading and parsing of the request body before your function is called. FastAPI awaits the request body reading and JSON parsing internally, validates the data with Pydantic, and then passes the fully parsed and validated model instance to your function. By the time your function runs, all the asynchronous operations have already completed, so you don’t need to use async/await in your function just to access the parsed data.
 
 ```
+
+__N.B:__ Fastapi automatically generates swagger UI, it has built in module in it
