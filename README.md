@@ -69,3 +69,14 @@ app = FastAPI()
 def read_items(user_agent: str = Header(default=None)):
     return {"User-Agent": user_agent}
 ```
+
+__Question:__ When using request.body() or request.json() directly inside my FastAPI endpoint function, why do I need to declare the function as async def and use await?
+But when I use a Pydantic model as a parameter, I don't need to use async/await in my function even though the request body is still being read asynchronously. Why is that?
+
+__Ans:__ 
+```bash
+When you use request.body() or request.json() directly inside your function, these methods are asynchronous and return coroutines that must be awaited. This means your function must be declared as async def so you can use await to properly read the request body without blocking. If you don’t use async def and await, Python will raise an error because you cannot await inside a synchronous function.
+
+In contrast, when you use a Pydantic model as a parameter in your endpoint function, FastAPI automatically handles the asynchronous reading and parsing of the request body before your function is called. FastAPI awaits the request body reading and JSON parsing internally, validates the data with Pydantic, and then passes the fully parsed and validated model instance to your function. By the time your function runs, all the asynchronous operations have already completed, so you don’t need to use async/await in your function just to access the parsed data.
+
+```
