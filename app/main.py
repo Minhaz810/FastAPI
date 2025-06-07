@@ -1,82 +1,69 @@
-from fastapi import FastAPI,Response,status,HTTPException,Request
+from fastapi import FastAPI,Response,status,HTTPException,Request,Depends
 from fastapi.params import Body
 from pydantic import BaseModel
 from typing import Optional
 import random
-from app.database import conn,cusror
+from sqlalchemy.orm import Session
 
-#making fast api instance
+
+from . import models
+from .database import engine,get_db
+
+models.Base.metadata.create_all(bind=engine)
+app = FastAPI()
+
 class Post(BaseModel):
     title:str
     content:str
-    published:bool =  True
-    rating: Optional[int] = None
+    published:bool = True
 
-app = FastAPI()
-posts = [{"title":"title of post 1","content":"content of post 1","id":1},{"title":"title of post 2","content":"content of post 2","id":2}]
 
-@app.get("/")
-async def root():
-    return {"message":"this is root"}
+#getting all posts
+@app.get("/posts")
+def get_all_posts(db:Session = Depends(get_db)):
+    posts = db.query(models.Post).all()
+    return {"data":posts}
 
-#the async keyword is optional, we need it only when we need some asynchronus task
-@app.get("/login")
-async def read_root():
-    return {"Hello": "Welcome to my api"} #fast api automatically converts it into json
+#getting a single post
+@app.get("/posts/{id}")
+def get_single_post(id:int, db:Session = Depends(get_db)):
+    post = db.query(models.Post).filter(models.Post.id == id)
+    post = post.first()
 
-# The order of api endpoints does matter
+    return {"data":post}
 
+
+#creating a post
 @app.post("/createpost")
-def createpost(new_post: Post,response:Response):
-    response.status_code = status.HTTP_201_CREATED
-    cusror.execute("""INSERT INTO posts (title,description) VALUES (%s, %s) RETURNING * """,(new_post.title,new_post.content))
-    new_post = cusror.fetchone()
-    
-    # query = f"""INSERT INTO posts (title,description) VALUES ('{new_post.title}','{new_post.content}')"""
-    # print(query)
-    # cusror.execute(query)    #vulnerable
-    conn.commit()
+def create_post(post:Post,db:Session = Depends(get_db)):
+    new_post =  models.Post(**post.model_dump()) #create a new post
+    db.add(new_post) #add it to our database
+    db.commit() #commit()
+    db.refresh(new_post) #stored back into the variable new_post
     return {"data":new_post}
 
-def find_post(id):
-    for p in posts:
-        if p["id"]==id:
-            return p
-        
-@app.get("/posts")
-def get_all_post():
-    cusror.execute("""SELECT * FROM posts""")
-    post_list = cusror.fetchall()
-    return {"post_detail":post_list}
 
-@app.get("/posts/{id}")
-def readpost(id:int,response:Response):
-    cusror.execute("""SELECT * FROM posts WHERE id = %s""",(id,))
-    post = cusror.fetchone()
-    return {"post_detail":post}
+#deleting a post
+@app.delete("/posts/{id}")
+def delete_post(id: int, db: Session = Depends(get_db)):
+    post_delete_query = db.query(models.Post).filter(models.Post.id == id)
+    
+    if post_delete_query.first():
+        post_delete_query.delete(synchronize_session=False)
+        db.commit()
+    else:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"post with id {id} does not exist")
 
-def find_index_post(id):
-    for i,p in enumerate(posts):
-        if p['id'] == id:
-            return i
-        
-@app.delete("/posts/{id}",status_code=status.HTTP_204_NO_CONTENT)
-def deletepost(id:int,response:Response):
-    index = find_index_post(id)
-    print(index)
-    if index == None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"post with {id} does not exist")
-    posts.pop(index)
-    response.status_code = status.HTTP_204_NO_CONTENT
-    return response
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @app.put("/posts/{id}")
-def update_post(id:int,post:Post):
-    body = post.model_dump()
-    index = find_index_post(id)
+def update_post(post:Post, id: int, db: Session = Depends(get_db)):
+    post_update_query = db.query(models.Post).filter(models.Post.id == id)
+    
+    if post_update_query.first():
+        post_update_query.update(post.model_dump(),synchronize_session=False)
+        db.commit()
+    else:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"post with id {id} does not exist")
 
-    posts[index]["title"] = body["title"]
-    posts[index]["content"] = body["content"]
-
-    return {f"Updated post with id {id}"}
-
+    return {"data":post_update_query.first()}

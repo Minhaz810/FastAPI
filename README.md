@@ -1,117 +1,130 @@
-# FastAPI
+# SQLAlchemy
 
-## Changing Status Code
-__import the status from fastapi__
+__N.B:__ it is a standalone library and has no assocation with FastAPI, can be used with any other web framework
+
+__N.B:__ SQLalchemy does not know how to talk to a database, it needs the databse driver (like pyscopg2).
+
+## Engine
+
+__The Engine is the starting point for any SQLAlchemy application.__
 ```bash
-from fastapi import FastAPI,status,HTTPException
+from sqlalchemy import create_engine
+
+engine = create_engine("postgresql+psycopg2://scott:tiger@localhost:5432/mydatabase")
 ```
-__place status code inside the HTTP Exception or response__(just like DRF)
-```bash
-response.status_code = status.HTTP_400_BAD_REQUEST
-```
-or
-```bash
-raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"post with {id} was not found")
-```
+The above engine creates a Dialect object tailored towards PostgreSQL, as well as a Pool object which will establish a DBAPI connection at localhost:5432 when a __connection request is first received.__ Note that the Engine and its underlying Pool do not establish the first actual DBAPI connection until the __Engine.connect()__ or __Engine.begin()__ methods are called.
 
-## deletion
-__N:B:__ when we are deleting something with the status code 204, then we should not send content back
+![Logo](https://docs.sqlalchemy.org/en/20/_images/sqla_engine_arch.png)
 
-__important:__
+__Dialect:__
 
-1.If a parameter is in the URL path (/posts/{id}), and you include it in your function with a matching name, FastAPI treats it as a path parameter.
+In SQLAlchemy, a dialect is the system SQLAlchemy uses to communicate with different types of databases (e.g., PostgreSQL, MySQL, SQLite, Oracle, etc.). Each database has its own SQL syntax and behaviors. A dialect abstracts these differences, allowing SQLAlchemy to generate the correct SQL and handle database-specific nuances.
 
-```bash
-@app.get("/posts/{id}")
-def get_post(id: int):  # <- FastAPI knows `id` comes from path
-    return {"id": id}
-```
+__Pool:__
 
-2. Any parameter with a simple type (str, int, bool, etc.) not in the path is treated as a query parameter.
+A connection pool is a cache of database connections maintained so they can be reused when future requests to the database are required. Instead of creating a new connection every time (which is expensive), SQLAlchemy keeps a few connections open and hands them out as needed.
+
+## Base
+
+The purpose of declarative_base in SQLAlchemy is to provide a base class for your ORM (Object Relational Mapping) models. It enables the use of declarative syntax to define database tables as Python classes, combining table structure and Python behavior in one place.
 
 ```bash
-@app.get("/search")
-def search_posts(query: str):  # <- ?query=example
-    return {"search": query}
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer, String
+
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = 'users'  # Name of the table in the DB
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    email = Column(String)
 ```
 
-3. If a parameter is a Pydantic model, FastAPI assumes it comes from the JSON body.
+## Session
+In the most general sense, the Session establishes all conversations with the database and represents a “holding zone” for all the objects which you’ve loaded or associated with it during its lifespan. It provides the interface where SELECT and other queries are made that will return and modify ORM-mapped objects
+
+The Session may be constructed on its own or by using the sessionmaker class. It typically is passed a single Engine as a source of connectivity up front.
+
+The purpose of sessionmaker is to provide a factory for Session objects with a fixed configuration. As it is typical that an application will have an Engine object in module scope, the sessionmaker can provide a factory for Session objects that are constructed against this engine
 
 ```bash
-from pydantic import BaseModel
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
-class Post(BaseModel):
-    title: str
-    content: str
+# an Engine, which the Session will use for connection
+# resources, typically in module scope
+engine = create_engine("postgresql+psycopg2://scott:tiger@localhost/")
 
-@app.post("/posts")
-def create_post(post: Post):  # <- From body
-    return post
+# a sessionmaker(), also in the same scope as the engine
+Session = sessionmaker(engine)
+
+# we can now construct a Session() without needing to pass the
+# engine each time
+with Session() as session:
+    session.add(some_object)
+    session.add(some_other_object)
+    session.commit()
+# closes the session
 ```
 
-4. Use Form(), Header(), Cookie(), etc., from fastapi to tell FastAPI how to extract the data.Use Form(), Header(), Cookie(), etc., from fastapi to tell FastAPI how to extract the data.
-
+Difference between session and sessionmaker
 ```bash
-from fastapi import Form
+from sqlalchemy.orm import Session
+from sqlalchemy import create_engine
 
-@app.post("/login")
-def login(username: str = Form(), password: str = Form()):
-    return {"user": username}
+engine = create_engine("sqlite:///example.db")
+
+# Must pass engine every time
+session = Session(bind=engine)
 ```
-
+using sessionmaker
 ```bash
-from fastapi import FastAPI, Header
+from sqlalchemy.orm import sessionmaker
 
-app = FastAPI()
+SessionLocal = sessionmaker(bind=engine)  # Configured once
 
-@app.get("/items/")
-def read_items(user_agent: str = Header(default=None)):
-    return {"User-Agent": user_agent}
+# Create sessions as needed
+session1 = SessionLocal()
+session2 = SessionLocal()
 ```
 
-__Question:__ When using request.body() or request.json() directly inside my FastAPI endpoint function, why do I need to declare the function as async def and use await?
-But when I use a Pydantic model as a parameter, I don't need to use async/await in my function even though the request body is still being read asynchronously. Why is that?
+__N.B:__ If we chagne something in model, it will not be reflected on database, Sqlalchemy does not do that default
 
-__Ans:__ 
+
+## Creating Session
 ```bash
-When you use request.body() or request.json() directly inside your function, these methods are asynchronous and return coroutines that must be awaited. This means your function must be declared as async def so you can use await to properly read the request body without blocking. If you don’t use async def and await, Python will raise an error because you cannot await inside a synchronous function.
-
-In contrast, when you use a Pydantic model as a parameter in your endpoint function, FastAPI automatically handles the asynchronous reading and parsing of the request body before your function is called. FastAPI awaits the request body reading and JSON parsing internally, validates the data with Pydantic, and then passes the fully parsed and validated model instance to your function. By the time your function runs, all the asynchronous operations have already completed, so you don’t need to use async/await in your function just to access the parsed data.
-
+# Everytime we get a database request, then we are making a session and after the request is done, the session is closed, this is why we are using generators
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 ```
+## Querying:
 
-__N.B:__ Fastapi automatically generates swagger UI, it has built in module in it.
-
-__N.B:__ if we connect the database like this
+__Get all__
 ```bash
-conn = psycopg2.connect(host="localhost",database="fastapi_test",user="postgres",password="pgadmin",port=5432)
+@app.get("/sqlalchemy")
+def test_posts(db:Session = Depends(get_db)):
+    var = db.query(your_model).all()
+    return {"data":var}
 ```
-then we don not get the column names, instead we only get the values
 
-__N.B:__ to get the column names, we should be doing this
-
+__Create:__
 ```bash
-from psycopg2.extras import RealDictCursor
-conn = psycopg2.connect(host="localhost",database="fastapi_test",user="postgres",password="pgadmin",port=5432,cursor_factory=RealDictCursor)
+@app.post("/createpost")
+def create_post(post:Post,db:Session = Depends(get_db)):
+    new_post =  models.Post(title=post.title,content=post.content) #create a new post
+    db.add(new_post) #add it to our database
+    db.commit() #commit()
+    db.refresh(new_post) #stored back into the variable new_post
+    return {"data":new_post} 
 ```
-
-
-__Passing Variable into the SQL query__
+But if we have 30 or 50 fields, writing every fields manually will be tough, so what we can do is we can unpack the dictionary
 ```bash
-cusror.execute("""INSERT INTO posts (title,description) VALUES (%s, %s) """,(new_post.title,new_post.content))
-```
-
-__We can also do this__
-```bash
-cusror.execute(f"""INSERT INTO posts (title,description) VALUES ({new_post.title},{new_post.desctription})""")
-```
-__but...__
-
-if some one sends some mallicious sql query into the title, then it would be a sql injection, like he can delete the whole table by this payload
-```json
-{
-  "title": "Test','Test'); DELETE FROM posts; --",
-  "content": "Malicious test"
-}
+**post.model_dump()
+new_post =  models.Post(**post.model_dump()) 
 ```
