@@ -128,3 +128,26 @@ But if we have 30 or 50 fields, writing every fields manually will be tough, so 
 **post.model_dump()
 new_post =  models.Post(**post.model_dump()) 
 ```
+
+__Delete:__
+```bash
+@app.delete("/posts/{id}")
+def delete_post(id: int, db: Session = Depends(get_db)):
+    post = db.query(models.Post).filter(models.Post.id == id)
+    
+    if post.first():
+        post.delete(synchronize_session=False)
+    else:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"post with id {id} does not exist")
+
+    return {"data":post}
+```
+__synchronize_session:__
+
+When you delete with synchronize_session=False, two things happen separately:
+
+1.  The database rows are deleted immediately.
+
+2.  The in-memory session objects are not updated and still exist in memory.
+
+So, the database and session can become out of sync if you use False.
