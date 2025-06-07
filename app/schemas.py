@@ -1,6 +1,7 @@
 # Here we will have all the pydantic/schema models
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 
 class Post(BaseModel):
     title:str
@@ -14,6 +15,16 @@ class CreatePost(BaseModel):
 
 class UpdatePost(BaseModel):
     published:bool #if the user is have the permission to update this published field only
+
+class PostResponse(BaseModel):
+    id:int
+    title:str
+    content:str
+    published:bool
+    create_at:datetime
+
+    class Config:
+        orm_mode = True
 
 """
 or we can do 

@@ -18,22 +18,22 @@ def get_all_posts(db:Session = Depends(get_db)):
     return {"data":posts}
 
 #getting a single post
-@app.get("/posts/{id}")
+@app.get("/posts/{id}", status_code=status.HTTP_200_OK, response_model=schemas.PostResponse)
 def get_single_post(id:int, db:Session = Depends(get_db)):
     post = db.query(models.Post).filter(models.Post.id == id)
     post = post.first()
 
-    return {"data":post}
+    return post
 
 
 #creating a post
-@app.post("/createpost")
+@app.post("/createpost",status_code=status.HTTP_201_CREATED,response_model=schemas.PostResponse)
 def create_post(post:schemas.Post,db:Session = Depends(get_db)):
     new_post =  models.Post(**post.model_dump()) #create a new post
     db.add(new_post) #add it to our database
     db.commit() #commit()
     db.refresh(new_post) #stored back into the variable new_post
-    return {"data":new_post}
+    return new_post
 
 
 #deleting a post
@@ -59,4 +59,4 @@ def update_post(post:schemas.Post, id: int, db: Session = Depends(get_db)):
     else:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"post with id {id} does not exist")
 
-    return {"data":post_update_query.first()}
+    return post_update_query.first()
