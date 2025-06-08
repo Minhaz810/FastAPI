@@ -1,14 +1,13 @@
 from fastapi import FastAPI,Response,status,HTTPException,Depends
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
 from sqlalchemy.exc import IntegrityError
 from . import schemas
-
+from . import utils
 
 from . import models
 from .database import engine,get_db
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
@@ -68,7 +67,7 @@ def update_post(post:schemas.Post, id: int, db: Session = Depends(get_db)):
 def create_user(user:schemas.UserCreate, db: Session =  Depends(get_db)):
     try:
         #hash the password
-        hashed_password = pwd_context.hash(user.password)
+        hashed_password = utils.hash(user.password)
         user.password = hashed_password
 
         #save in db
