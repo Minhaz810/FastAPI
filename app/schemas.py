@@ -3,6 +3,31 @@ from pydantic import BaseModel,EmailStr
 from typing import Optional
 from datetime import datetime
 
+
+
+class UserCreate(BaseModel):
+    email:EmailStr
+    password:str
+
+class UserResponse(BaseModel):
+    id:int
+    email:EmailStr
+    created_at:datetime
+
+    class Config:
+        from_attributes = True
+
+class UserLogin(BaseModel):
+    email:EmailStr
+    password:str
+
+class Token(BaseModel):
+    access_token:str
+    token_type:str
+
+class TokenData(BaseModel):
+    id:Optional[int]
+
 class Post(BaseModel):
     title:str
     content:str
@@ -21,7 +46,9 @@ class PostResponse(BaseModel):
     title:str
     content:str
     published:bool
-    create_at:datetime
+    created_at:datetime
+    user_id:int
+    user:UserResponse
 
     class Config:
         from_attributes = True
@@ -40,26 +67,3 @@ class UpdatePost(BaseModel):
     published: bool #if the user is have the permission to update this published field only
 
 """
-
-class UserCreate(BaseModel):
-    email:EmailStr
-    password:str
-
-class UserResponse(BaseModel):
-    id:int
-    email:EmailStr
-    create_at:datetime
-
-    class Config:
-        from_attributes = True
-
-class UserLogin(BaseModel):
-    email:EmailStr
-    password:str
-
-class Token(BaseModel):
-    access_token:str
-    token_type:str
-
-class TokenData(BaseModel):
-    id:Optional[int]

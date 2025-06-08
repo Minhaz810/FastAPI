@@ -10,7 +10,7 @@ router = APIRouter(
 )
 #getting all posts
 @router.get("/")
-def get_all_posts(db:Session = Depends(get_db),user_id:int = Depends(oauth2.get_current_user)):
+def get_all_posts(db:Session = Depends(get_db),user_id:schemas.TokenData = Depends(oauth2.get_current_user)):
     posts = db.query(models.Post).all()
     return {"data":posts}
 
@@ -24,9 +24,9 @@ def get_single_post(id:int, db:Session = Depends(get_db)):
 
 
 #creating a post
-@router.post("/",status_code=status.HTTP_201_CREATED,response_model=schemas.PostResponse)
-def create_post(post:schemas.Post,db:Session = Depends(get_db)):
-    new_post =  models.Post(**post.model_dump()) #create a new post
+@router.post("/",status_code=status.HTTP_201_CREATED,response_model=schemas.PostResponse,)
+def create_post(post:schemas.Post,token_data:schemas.TokenData = Depends(oauth2.get_current_user),db:Session = Depends(get_db)):
+    new_post =  models.Post(user_id=token_data.id,**post.model_dump()) #create a new post
     db.add(new_post) #add it to our database
     db.commit() #commit()
     db.refresh(new_post) #stored back into the variable new_post
