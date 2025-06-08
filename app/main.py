@@ -2,6 +2,7 @@ from fastapi import FastAPI,Response,status,HTTPException,Request,Depends
 from fastapi.params import Body
 import random
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from . import schemas
 
 
@@ -60,3 +61,21 @@ def update_post(post:schemas.Post, id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"post with id {id} does not exist")
 
     return post_update_query.first()
+
+
+@app.post("/users",status_code=status.HTTP_201_CREATED,response_class=schemas.UserResponse)
+def create_user(user:schemas.UserCreate, db: Session =  Depends(get_db)):
+    try:
+        new_user = models.User(**user.model_dump())
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        return new_user
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+
+    return new_user

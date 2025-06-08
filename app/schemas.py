@@ -1,5 +1,5 @@
 # Here we will have all the pydantic/schema models
-from pydantic import BaseModel
+from pydantic import BaseModel,EmailStr
 from typing import Optional
 from datetime import datetime
 
@@ -24,7 +24,7 @@ class PostResponse(BaseModel):
     create_at:datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 """
 or we can do 
@@ -40,3 +40,14 @@ class UpdatePost(BaseModel):
     published: bool #if the user is have the permission to update this published field only
 
 """
+
+class UserCreate(BaseModel):
+    email:EmailStr
+    password:str
+
+class UserResponse(BaseModel):
+    id:str
+    email:EmailStr
+
+    class Config:
+        from_attributes = True
