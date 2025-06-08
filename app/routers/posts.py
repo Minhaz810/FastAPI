@@ -3,15 +3,17 @@ from fastapi import FastAPI,status,HTTPException,Response,Depends,APIRouter
 from sqlalchemy.orm import Session
 from .. database import get_db
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/posts"
+)
 #getting all posts
-@router.get("/posts")
+@router.get("/")
 def get_all_posts(db:Session = Depends(get_db)):
     posts = db.query(models.Post).all()
     return {"data":posts}
 
 #getting a single post
-@router.get("/posts/{id}", status_code=status.HTTP_200_OK, response_model=schemas.PostResponse)
+@router.get("/{id}", status_code=status.HTTP_200_OK, response_model=schemas.PostResponse)
 def get_single_post(id:int, db:Session = Depends(get_db)):
     post = db.query(models.Post).filter(models.Post.id == id)
     post = post.first()
@@ -20,7 +22,7 @@ def get_single_post(id:int, db:Session = Depends(get_db)):
 
 
 #creating a post
-@router.post("/createpost",status_code=status.HTTP_201_CREATED,response_model=schemas.PostResponse)
+@router.post("/",status_code=status.HTTP_201_CREATED,response_model=schemas.PostResponse)
 def create_post(post:schemas.Post,db:Session = Depends(get_db)):
     new_post =  models.Post(**post.model_dump()) #create a new post
     db.add(new_post) #add it to our database
@@ -30,7 +32,7 @@ def create_post(post:schemas.Post,db:Session = Depends(get_db)):
 
 
 #deleting a post
-@router.delete("/posts/{id}")
+@router.delete("/{id}")
 def delete_post(id: int, db: Session = Depends(get_db)):
     post_delete_query = db.query(models.Post).filter(models.Post.id == id)
     
@@ -42,7 +44,7 @@ def delete_post(id: int, db: Session = Depends(get_db)):
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-@router.put("/posts/{id}")
+@router.put("/{id}")
 def update_post(post:schemas.Post, id: int, db: Session = Depends(get_db)):
     post_update_query = db.query(models.Post).filter(models.Post.id == id)
     
