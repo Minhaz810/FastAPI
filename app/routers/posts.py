@@ -1,7 +1,8 @@
-from .. import models,schemas,utils
+from .. import models,schemas,utils,oauth2
 from fastapi import FastAPI,status,HTTPException,Response,Depends,APIRouter
 from sqlalchemy.orm import Session
 from .. database import get_db
+
 
 router = APIRouter(
     prefix="/posts",
@@ -9,7 +10,7 @@ router = APIRouter(
 )
 #getting all posts
 @router.get("/")
-def get_all_posts(db:Session = Depends(get_db)):
+def get_all_posts(db:Session = Depends(get_db),user_id:int = Depends(oauth2.get_current_user)):
     posts = db.query(models.Post).all()
     return {"data":posts}
 
